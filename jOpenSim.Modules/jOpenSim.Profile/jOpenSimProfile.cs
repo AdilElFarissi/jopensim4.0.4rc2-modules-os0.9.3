@@ -25,6 +25,7 @@
  */
 
 using System;
+using System.IO;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -34,8 +35,11 @@ using System.Net.Sockets;
 using System.Net.Security;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Xml;
 using OpenMetaverse;
+using OpenMetaverse.Imaging;
 using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
@@ -43,6 +47,7 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
 using Mono.Addins;
 
 
@@ -79,6 +84,9 @@ namespace jOpenSim.Profile.jOpenProfile
         public string m_moduleVersion = "0.4.0.2";
         public bool m_Debug = false;
         public string compileVersion = OpenSim.VersionInfo.VersionNumber;
+        private IAssetService m_AssetService;
+        private bool m_enabledTextureExport = false;
+        private string m_textureFormat;
 
         public void Initialise(IConfigSource config)
         {
@@ -100,6 +108,22 @@ namespace jOpenSim.Profile.jOpenProfile
                 m_ProfileServer = profileConfig.GetString("ProfileURL", "");
                 m_ProfileModul = profileConfig.GetString("Module", "");
                 m_Debug = profileConfig.GetBoolean("Debug", false);
+                m_enabledTextureExport = profileConfig.GetBoolean("EnableTextureExport", false);
+                m_textureFormat = profileConfig.GetString("TextureFormat", "png");
+
+                if (m_enabledTextureExport)
+                {
+                    string assetService = profileConfig.GetString("AssetService", String.Empty);
+
+                    if (String.IsNullOrEmpty(assetService))
+                    throw new Exception("No AssetService in config file");
+
+                    Object[] args = new Object[] { config };
+                    m_AssetService = ServerUtils.LoadPlugin<IAssetService>(assetService, args);
+
+                    if (m_AssetService == null)
+                    throw new Exception(String.Format("Failed to load AssetService from {0};", assetService));
+                }
 
                 if (m_ProfileModul != "jOpenSimProfile")
                 {
@@ -370,6 +394,62 @@ namespace jOpenSim.Profile.jOpenProfile
             return RespData;
         }
 
+        // Textures converter adapted from OpenSim GetTexture system.
+        private string GetTextureBase64(string textureID)
+        {
+            if(string.IsNullOrEmpty(textureID)) return null;
+            
+            AssetBase texture = m_AssetService.Get(textureID.ToString());
+            
+            if (texture != null)
+            {
+                string data = string.Empty;
+
+                MemoryStream imgstream = new MemoryStream();
+                Bitmap mTexture = null;
+                ManagedImage managedImage = null;
+                Image image = null;
+
+                try
+                {
+                    // Taking our jpeg2000 data, decoding it, then saving it to a byte array with regular data
+                    // Decode image to System.Drawing.Image
+                    if (OpenJPEG.DecodeToImage(texture.Data, out managedImage, out image) && image != null)
+                    {
+                        // Save to bitmap
+                        mTexture = new Bitmap(image);
+                        mTexture.Save(imgstream, m_textureFormat == "png" ? ImageFormat.Png : ImageFormat.Jpeg);
+                        // Write the stream to a base64 for output
+                        data = Convert.ToBase64String(imgstream.ToArray());
+
+                    }
+                }
+                catch (Exception e)
+                {
+                    m_log.WarnFormat("[jOpenSimProfile]: Unable to convert texture {0} : {1}", texture.ID, e.Message);
+                }
+                finally
+                {
+                    // Reclaim memory, these are unmanaged resources
+                    // If we encountered an exception, one or more of these will be null
+                    if (mTexture != null)
+                        mTexture.Dispose();
+
+                    if (image != null)
+                        image.Dispose();
+
+                    if(managedImage != null)
+                        managedImage.Clear();
+
+                    if (imgstream != null)
+                        imgstream.Dispose();
+                }
+                return data;
+            }
+            return null;
+        }
+
+
         // Classifieds Handler
 
         public void HandleAvatarClassifiedsRequest(Object sender, string method, List<String> args)
@@ -495,6 +575,15 @@ namespace jOpenSim.Profile.jOpenProfile
             ReqHash["description"] = queryDescription;
             ReqHash["parentestate"] = queryParentEstate.ToString();
             ReqHash["snapshotUUID"] = querySnapshotID.ToString();
+            
+            if (m_enabledTextureExport)
+            {
+                string imageB64 = GetTextureBase64(querySnapshotID.ToString());
+                if (imageB64 != null){
+                    ReqHash["snapshotBase64"] = imageB64;
+                }
+            }
+
             ReqHash["sim_name"] = remoteClient.Scene.RegionInfo.RegionName;
             ReqHash["globalpos"] = queryGlobalPos.ToString();
             ReqHash["classifiedFlags"] = queryclassifiedFlags.ToString();
@@ -515,6 +604,7 @@ namespace jOpenSim.Profile.jOpenProfile
                                             avaPos.Z);
 
             ReqHash["pos_global"] = posGlobal.ToString();
+
 
             Hashtable result = GenericXMLRPCRequest(ReqHash,
                     "classified_update");
@@ -670,6 +760,13 @@ namespace jOpenSim.Profile.jOpenProfile
             ReqHash["name"] = name;
             ReqHash["desc"] = desc;
             ReqHash["snapshot_id"] = snapshotID.ToString();
+            if (m_enabledTextureExport)
+            {
+                string imageB64 = GetTextureBase64(snapshotID.ToString());
+                if (imageB64 != null){
+                    ReqHash["snapshot_Base64"] = imageB64;
+                }
+            }
             ReqHash["sort_order"] = sortOrder.ToString();
             ReqHash["enabled"] = enabled.ToString();
             ReqHash["sim_name"] = remoteClient.Scene.RegionInfo.RegionName;
@@ -1011,8 +1108,26 @@ namespace jOpenSim.Profile.jOpenProfile
                 ReqHash["avatar_id"] = remoteClient.AgentId.ToString();
                 ReqHash["ProfileUrl"] = newProfile.WebUrl;
                 ReqHash["Image"] = newProfile.ImageId.ToString();
+
+                if (m_enabledTextureExport && newProfile.ImageId != UUID.Zero)
+                {
+                    string imageB64 = GetTextureBase64(newProfile.ImageId.ToString());
+                    if (imageB64 != null){
+                        ReqHash["ImageBase64"] = imageB64;
+                    }
+                }
+
                 ReqHash["AboutText"] = newProfile.AboutText;
                 ReqHash["FirstLifeImage"] = newProfile.FirstLifeImageId.ToString();
+                
+                if (m_enabledTextureExport && newProfile.FirstLifeImageId != UUID.Zero)
+                {
+                    string imageB64 = GetTextureBase64(newProfile.FirstLifeImageId.ToString());
+                    if (imageB64 != null){
+                        ReqHash["FirstLifeImageBase64"] = imageB64;
+                    }
+                }
+
                 ReqHash["FirstLifeAboutText"] = newProfile.FirstLifeText;
                 ReqHash["userFlags"] = newProfile.PublishProfile ? 1 : 0;
 
