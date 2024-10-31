@@ -8,13 +8,15 @@
 ### Usage
 Copy the content of the bin folder to the OpenSim bin folder and set following the instructions in your Joomla admin > Components > jOpenSim > Addon Help (Search and Profiles).
 You have to add the following under [Profile] section in your standaloneCommon.ini or GridCommon.ini
-<pre>EnableTextureExport = true
-    ; Exported image extension, must be the same as your jOpenSim settings (png or jpg)
-    ; Default: png.
-    TextureFormat = "png"
-    AssetService = "OpenSim.Services.AssetService.dll:AssetService"
-	; or in case of FSAsset in use:
-	;AssetService = "OpenSim.Services.FSAssetService.dll:FSAssetConnector"</pre>
+<pre>
+EnableTextureExport = true
+; Exported image extension, must be the same as your jOpenSim settings (png or jpg)
+; Default: png.
+TextureFormat = "png"
+AssetService = "OpenSim.Services.AssetService.dll:AssetService"
+; or in case of FSAsset in use:
+;AssetService = "OpenSim.Services.FSAssetService.dll:FSAssetConnector"
+</pre>
 
 ### Compile
 Compile OpenSim first...
