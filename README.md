@@ -1,11 +1,20 @@
 ## jOpenSim v4.0.4RC2 search and profile modules for OpenSimulator v0.9.3.
 ### Change Log
++ Added texture export functionality 
 + Fix to make GenericXMLRPCRequest use HttpClient set in WebUtils and configured on the [Startup] and [Network] sections of OpenSim.ini
 + Replaced UserProfileData (obsolete) by OpenSim core class UserProfileProperties.
 + Many magic touches :)
 
 ### Usage
 Copy the content of the bin folder to the OpenSim bin folder and set following the instructions in your Joomla admin > Components > jOpenSim > Addon Help (Search and Profiles).
+You have to add the following under [Profile] section in your standaloneCommon.ini or GridCommon.ini
+<pre>EnableTextureExport = true
+    ; Exported image extension, must be the same as your jOpenSim settings (png or jpg)
+    ; Default: png.
+    TextureFormat = "png"
+    AssetService = "OpenSim.Services.AssetService.dll:AssetService"
+	; or in case of FSAsset in use:
+	;AssetService = "OpenSim.Services.FSAssetService.dll:FSAssetConnector"</pre>
 
 ### Compile
 Compile OpenSim first...
