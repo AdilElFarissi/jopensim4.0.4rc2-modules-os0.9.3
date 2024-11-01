@@ -1295,7 +1295,7 @@ class jOpenSimHelper
 		// generate img tags
 		if($profile['image'] && $profile['image'] != $this->zerouid) {
 //			if(JDEBUG) Log::add('jOpenSimHelper getTextureImage img: '.$profile['image'], Log::DEBUG, 'jopensim-debug');
-			$profile['imagetag'] = $this->getTextureImage($profile['image'],null,"profile");
+			$profile['imagetag'] = $this->getTextureImage($userid,null,"profile");
 		} else {
 //			if(JDEBUG) Log::add('jOpenSimHelper not present img???', Log::DEBUG, 'jopensim-debug');
 			$profile['imagetag'] = null;
@@ -1303,7 +1303,7 @@ class jOpenSimHelper
 
 		if($profile['firstLifeImage'] && $profile['firstLifeImage'] != $this->zerouid) {
 //			if(JDEBUG) Log::add('jOpenSimHelper getTextureImage firstLifeImage: '.$profile['firstLifeImage'], Log::DEBUG, 'jopensim-debug');
-			$profile['firstLifeImagetag'] = $this->getTextureImage($profile['firstLifeImage'],null,"firstLifeImage");
+			$profile['firstLifeImagetag'] = $this->getTextureImage($userid,null,"firstLifeImage");
 		} else {
 			$profile['firstLifeImagetag'] = null;
 		}
@@ -1328,8 +1328,8 @@ class jOpenSimHelper
 	}
 
 	public function getTextureImage($textureID, $class = null, $type = null) {
-		$textureCache		= $this->settingsData['getTextureCache'];
-		$textureFormat		= "png" /*$this->settingsData['getTextureFormat']*/;
+
+		$textureFormat		= "png";
 		$fileName;
 		switch($type){
 			case "profile":
@@ -1353,9 +1353,9 @@ class jOpenSimHelper
 			default:
 			$fileName = $textureID.".".$textureFormat;
 		}
-		if(!$textureCache) { // cache enabled, get file if present or download if not
-			$filepath	= 'images'.DIRECTORY_SEPARATOR.'jopensim'.DIRECTORY_SEPARATOR.'texturecache'.DIRECTORY_SEPARATOR.$fileName;
-			if(file_exists($filepath)) {
+
+		$filepath	= 'images'.DIRECTORY_SEPARATOR.'jopensim'.DIRECTORY_SEPARATOR.'texturecache'.DIRECTORY_SEPARATOR.$fileName;
+		if(file_exists($filepath)) {
 				
 			$attr['title']	= $textureID;
 			if($class) {
@@ -1363,8 +1363,8 @@ class jOpenSimHelper
 			}
 			$img = HTMLHelper::image($filepath,$textureID,$attr);
 			return $img;
-			}
 		}
+		return null;
 	}
 
 
